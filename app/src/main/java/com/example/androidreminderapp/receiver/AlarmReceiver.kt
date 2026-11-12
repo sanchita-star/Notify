@@ -81,7 +81,13 @@ class AlarmReceiver : BroadcastReceiver() {
                                     reminderDao.getReminderById(reminderId)?.let {
                                         entryPoint.reminderCloudStore().save(userId, it)
                                     }
-                                    NotificationHelper.showReminderNotification(context, reminder.id, reminder.title, reminder.description)
+                                    NotificationHelper.showReminderNotification(
+                                        context,
+                                        reminder.id,
+                                        reminder.title,
+                                        reminder.description,
+                                        reminder.snoozeMinutes
+                                    )
                                     val updated = reminder.copy(timeInMillis = nextTrigger)
                                     val scheduled = AlarmScheduler.scheduleAlarm(context, updated, nextTrigger)
                                     if (!scheduled) {
@@ -97,7 +103,13 @@ class AlarmReceiver : BroadcastReceiver() {
                                     reminderDao.getReminderById(reminderId)?.let {
                                         entryPoint.reminderCloudStore().save(userId, it)
                                     }
-                                    NotificationHelper.showReminderNotification(context, reminder.id, reminder.title, reminder.description)
+                                    NotificationHelper.showReminderNotification(
+                                        context,
+                                        reminder.id,
+                                        reminder.title,
+                                        reminder.description,
+                                        reminder.snoozeMinutes
+                                    )
                                 }
                             }
                         } else {
@@ -109,7 +121,13 @@ class AlarmReceiver : BroadcastReceiver() {
                                 reminderDao.getReminderById(reminderId)?.let {
                                     entryPoint.reminderCloudStore().save(userId, it)
                                 }
-                                NotificationHelper.showReminderNotification(context, reminder.id, reminder.title, reminder.description)
+                                NotificationHelper.showReminderNotification(
+                                    context,
+                                    reminder.id,
+                                    reminder.title,
+                                    reminder.description,
+                                    reminder.snoozeMinutes
+                                )
                             }
                         }
                     }

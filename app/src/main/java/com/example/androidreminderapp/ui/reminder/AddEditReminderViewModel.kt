@@ -29,7 +29,7 @@ class AddEditReminderViewModel @Inject constructor(
     var selectedWeekDays by mutableStateOf<List<Int>>(emptyList())
     var repeatUntil by mutableStateOf<Long?>(null)
     var alarmSound by mutableStateOf("default")
-    var snoozeMinutes by mutableStateOf(5)
+    var snoozeMinutes by mutableStateOf(10)
     var isActive by mutableStateOf(true)
     var isCompleted by mutableStateOf(false)
 

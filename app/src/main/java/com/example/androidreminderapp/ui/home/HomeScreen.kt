@@ -11,10 +11,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,7 +49,9 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onAddReminder: () -> Unit,
     onEditReminder: (Long) -> Unit,
-    onLogout: () -> Unit
+    onOpenReminders: () -> Unit = {},
+    onOpenProfile: () -> Unit = {},
+    onOpenSettings: () -> Unit = {}
 ) {
     val reminders by viewModel.reminders.collectAsState()
     val cloudSyncError by viewModel.cloudSyncError.collectAsState()
@@ -143,23 +148,24 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        IconButton(onClick = onLogout) {
+                        IconButton(onClick = onOpenProfile) {
                             Icon(
-                                Icons.AutoMirrored.Filled.ExitToApp,
-                                contentDescription = "Sign out",
-                                tint = MaterialTheme.colorScheme.onSurface
+                                Icons.Default.AccountCircle,
+                                contentDescription = "Profile",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(30.dp)
                             )
                         }
                         Text(
-                            "Alarm",
+                            "Home",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        IconButton(onClick = onAddReminder) {
+                        IconButton(onClick = onOpenSettings) {
                             Icon(
-                                Icons.Default.Add,
-                                contentDescription = "Add alarm",
+                                Icons.Default.Settings,
+                                contentDescription = "Settings",
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -208,24 +214,54 @@ fun HomeScreen(
                                 .height(174.dp)
                         )
                         Text(
-                            "Next alarm",
+                            "Sleep time",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = nextReminder?.let {
-                                SimpleDateFormat("h:mm", Locale.getDefault()).format(Date(it.timeInMillis))
-                            } ?: "All clear",
+                            text = "07 hr 30 min",
                             style = MaterialTheme.typography.headlineLarge,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = nextReminder?.let {
-                                "${SimpleDateFormat("a", Locale.getDefault()).format(Date(it.timeInMillis))}  ·  ${it.title}"
+                                "Next alarm  ${SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(it.timeInMillis))}  ·  ${it.title}"
                             } ?: "Make a little room for what matters.",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        HomeShortcut(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.Alarm,
+                            label = "Alarm",
+                            onClick = onAddReminder
+                        )
+                        HomeShortcut(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.Notifications,
+                            label = "Reminder",
+                            onClick = onOpenReminders
+                        )
+                        HomeShortcut(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.Person,
+                            label = "Profile",
+                            onClick = onOpenProfile
+                        )
+                        HomeShortcut(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.Settings,
+                            label = "Settings",
+                            onClick = onOpenSettings
                         )
                     }
                 }
@@ -238,7 +274,7 @@ fun HomeScreen(
                     ) {
                         Column {
                             Text(
-                                "Alarm",
+                                "Upcoming Alarms",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.SemiBold
@@ -337,6 +373,44 @@ fun HomeScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HomeShortcut(
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier
+            .height(62.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(vertical = 7.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(21.dp)
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }

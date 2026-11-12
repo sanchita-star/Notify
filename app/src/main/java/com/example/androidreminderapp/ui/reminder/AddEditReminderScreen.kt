@@ -2,6 +2,14 @@ package com.example.androidreminderapp.ui.reminder
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.app.AlarmManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -14,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -24,6 +33,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.androidreminderapp.ui.theme.NotifyNightBackground
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -36,6 +46,50 @@ fun AddEditReminderScreen(
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+    var exactAlarmDialogOpen by rememberSaveable { mutableStateOf(false) }
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    val exactAlarmSettingsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && alarmManager.canScheduleExactAlarms()) {
+            viewModel.saveReminder(context, onNavigateBack)
+        }
+    }
+
+    if (exactAlarmDialogOpen) {
+        AlertDialog(
+            onDismissRequest = { exactAlarmDialogOpen = false },
+            title = { Text("Allow exact alarms?") },
+            text = {
+                Text("Exact alarm access lets Notify ring at the time you choose. You can continue with less precise alarms instead.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        exactAlarmDialogOpen = false
+                        exactAlarmSettingsLauncher.launch(
+                            Intent(
+                                Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                Uri.parse("package:${context.packageName}")
+                            )
+                        )
+                    }
+                ) {
+                    Text("Allow access")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        exactAlarmDialogOpen = false
+                        viewModel.saveReminder(context, onNavigateBack)
+                    }
+                ) {
+                    Text("Use approximate")
+                }
+            }
+        )
+    }
 
     LaunchedEffect(reminderId) {
         if (reminderId != null && reminderId > 0L) {
@@ -133,8 +187,14 @@ fun AddEditReminderScreen(
             Surface(color = MaterialTheme.colorScheme.background) {
                 Button(
                     onClick = {
-                        viewModel.saveReminder(context) {
-                            onNavigateBack()
+                        if (
+                            viewModel.isActive &&
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                            !alarmManager.canScheduleExactAlarms()
+                        ) {
+                            exactAlarmDialogOpen = true
+                        } else {
+                            viewModel.saveReminder(context, onNavigateBack)
                         }
                     },
                     modifier = Modifier
@@ -159,7 +219,7 @@ fun AddEditReminderScreen(
         containerColor = Color.Transparent
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            NightGradient()
+            NotifyNightBackground()
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -327,7 +387,7 @@ private fun TimeChoiceCard(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (selected) {
-                Color(0xFFCF2DBD)
+                MaterialTheme.colorScheme.primary
             } else {
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
             }
@@ -410,25 +470,6 @@ private fun TimeDial(time: String, onClick: () -> Unit) {
             )
             Text(time, style = MaterialTheme.typography.headlineMedium)
             Text("Tap to change", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun NightGradient() {
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        drawRect(
-            brush = Brush.verticalGradient(
-                listOf(Color(0xFF3A0B46), Color(0xFF1E0F28), Color(0xFF100916))
-            )
-        )
-        val random = kotlin.random.Random(31)
-        repeat(75) {
-            drawCircle(
-                color = Color(0xFFFFE9FF).copy(alpha = random.nextFloat() * 0.4f + 0.1f),
-                radius = random.nextFloat() * 1.4f + 0.35f,
-                center = Offset(random.nextFloat() * size.width, random.nextFloat() * size.height)
-            )
         }
     }
 }

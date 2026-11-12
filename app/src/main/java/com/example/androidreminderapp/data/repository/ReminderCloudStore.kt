@@ -58,7 +58,7 @@ class ReminderCloudStore @Inject constructor(
                         .asIntList(),
                     repeatUntil = document.getLong("repeatUntil"),
                     alarmSound = document.getString("alarmSound") ?: "default",
-                    snoozeMinutes = document.getLong("snoozeMinutes")?.toInt() ?: 5,
+                    snoozeMinutes = document.getLong("snoozeMinutes")?.toInt() ?: 10,
                     isActive = document.getBoolean("isActive") ?: true,
                     isCompleted = document.getBoolean("isCompleted") ?: false
                 )

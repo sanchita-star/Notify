@@ -12,7 +12,7 @@ data class Reminder(
     val selectedWeekDays: List<Int> = emptyList(),
     val repeatUntil: Long? = null,
     val alarmSound: String = "default",
-    val snoozeMinutes: Int = 5,
+    val snoozeMinutes: Int = 10,
     val isActive: Boolean = true,
     val isCompleted: Boolean = false
 )
