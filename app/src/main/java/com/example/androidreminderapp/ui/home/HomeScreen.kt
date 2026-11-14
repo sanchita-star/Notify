@@ -54,7 +54,6 @@ fun HomeScreen(
     onOpenSettings: () -> Unit = {}
 ) {
     val reminders by viewModel.reminders.collectAsState()
-    val cloudSyncError by viewModel.cloudSyncError.collectAsState()
     val context = LocalContext.current
     var selectedFilter by remember { mutableStateOf(AlarmFilter.ALL) }
     var reminderToDelete by remember { mutableStateOf<Reminder?>(null) }
@@ -168,35 +167,6 @@ fun HomeScreen(
                                 contentDescription = "Settings",
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
-                        }
-                    }
-                }
-
-                cloudSyncError?.let { message ->
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = message,
-                                    modifier = Modifier.weight(1f),
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                                TextButton(
-                                    onClick = { viewModel.synchronizeCloudReminders(context) }
-                                ) {
-                                    Text("Retry")
-                                }
-                            }
                         }
                     }
                 }

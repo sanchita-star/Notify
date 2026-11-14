@@ -196,9 +196,7 @@ fun FullScreenReminderScreen(
                         Spacer(Modifier.width(8.dp))
                         Text("Dismiss", color = Color.White, fontWeight = FontWeight.SemiBold)
                     }
-                    TextButton(onClick = onMarkDone) {
-                        Text("Mark done", color = Color.White.copy(alpha = 0.78f))
-                    }
+                   
                 }
             }
         }
