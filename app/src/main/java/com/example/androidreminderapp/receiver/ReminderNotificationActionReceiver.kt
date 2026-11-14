@@ -23,6 +23,7 @@ class ReminderNotificationActionReceiver : BroadcastReceiver() {
         val title = intent.getStringExtra(NotificationHelper.EXTRA_TITLE) ?: "Reminder"
         val description = intent.getStringExtra(NotificationHelper.EXTRA_DESCRIPTION)
         val snoozeMinutes = intent.getIntExtra(NotificationHelper.EXTRA_SNOOZE_MINUTES, 10)
+        val alarmSound = intent.getStringExtra(NotificationHelper.EXTRA_ALARM_SOUND) ?: "default"
 
         if (intent.action == NotificationHelper.ACTION_SHOW_SNOOZED) {
             NotificationHelper.showReminderNotification(
@@ -30,7 +31,8 @@ class ReminderNotificationActionReceiver : BroadcastReceiver() {
                 reminderId,
                 title,
                 description,
-                snoozeMinutes
+                snoozeMinutes,
+                alarmSound
             )
             return
         }
@@ -46,7 +48,8 @@ class ReminderNotificationActionReceiver : BroadcastReceiver() {
                             reminderId,
                             title,
                             description,
-                            snoozeMinutes
+                            snoozeMinutes,
+                            alarmSound
                         )
                     }
 

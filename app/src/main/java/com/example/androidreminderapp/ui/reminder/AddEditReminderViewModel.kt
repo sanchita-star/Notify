@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.androidreminderapp.domain.model.Reminder
 import com.example.androidreminderapp.domain.repository.ReminderRepository
 import com.example.androidreminderapp.service.AlarmScheduler
+import com.example.androidreminderapp.service.NotificationHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -102,13 +103,45 @@ class AddEditReminderViewModel @Inject constructor(
                 if (reminderId == 0L) {
                     val id = reminderRepository.insertReminder(reminder)
                     val savedReminder = reminder.copy(id = id)
+                    reminderId = id
+                    cloudId = savedReminder.cloudId
                     if (savedReminder.isActive) {
-                        AlarmScheduler.scheduleAlarm(context, savedReminder, savedReminder.timeInMillis)
+                        val scheduled = AlarmScheduler.scheduleAlarm(
+                            context,
+                            savedReminder,
+                            savedReminder.timeInMillis
+                        )
+                        if (!scheduled) {
+                            throw IllegalStateException(
+                                "The reminder was saved, but its alarm could not be scheduled. Check alarm access and try again."
+                            )
+                        }
+                        if (savedReminder.timeInMillis > System.currentTimeMillis() + 5_000L) {
+                            NotificationHelper.showScheduledReminderNotification(
+                                context,
+                                savedReminder.id,
+                                savedReminder.title,
+                                savedReminder.timeInMillis
+                            )
+                        }
                     }
                 } else {
                     reminderRepository.updateReminder(reminder)
                     if (reminder.isActive) {
-                        AlarmScheduler.scheduleAlarm(context, reminder, reminder.timeInMillis)
+                        val scheduled = AlarmScheduler.scheduleAlarm(context, reminder, reminder.timeInMillis)
+                        if (!scheduled) {
+                            throw IllegalStateException(
+                                "The reminder was saved, but its alarm could not be scheduled. Check alarm access and try again."
+                            )
+                        }
+                        if (reminder.timeInMillis > System.currentTimeMillis() + 5_000L) {
+                            NotificationHelper.showScheduledReminderNotification(
+                                context,
+                                reminder.id,
+                                reminder.title,
+                                reminder.timeInMillis
+                            )
+                        }
                     } else {
                         AlarmScheduler.cancelAlarm(context, reminder.id)
                     }

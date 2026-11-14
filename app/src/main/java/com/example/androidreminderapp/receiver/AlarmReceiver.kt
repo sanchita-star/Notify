@@ -86,7 +86,8 @@ class AlarmReceiver : BroadcastReceiver() {
                                         reminder.id,
                                         reminder.title,
                                         reminder.description,
-                                        reminder.snoozeMinutes
+                                        reminder.snoozeMinutes,
+                                        reminder.alarmSound
                                     )
                                     val updated = reminder.copy(timeInMillis = nextTrigger)
                                     val scheduled = AlarmScheduler.scheduleAlarm(context, updated, nextTrigger)
@@ -108,7 +109,8 @@ class AlarmReceiver : BroadcastReceiver() {
                                         reminder.id,
                                         reminder.title,
                                         reminder.description,
-                                        reminder.snoozeMinutes
+                                        reminder.snoozeMinutes,
+                                        reminder.alarmSound
                                     )
                                 }
                             }
@@ -126,7 +128,8 @@ class AlarmReceiver : BroadcastReceiver() {
                                     reminder.id,
                                     reminder.title,
                                     reminder.description,
-                                    reminder.snoozeMinutes
+                                    reminder.snoozeMinutes,
+                                    reminder.alarmSound
                                 )
                             }
                         }

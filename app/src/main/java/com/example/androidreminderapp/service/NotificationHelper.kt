@@ -2,6 +2,7 @@ package com.example.androidreminderapp.service
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -12,6 +13,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.media.AudioAttributes
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -20,21 +22,29 @@ import androidx.core.content.ContextCompat
 import com.example.androidreminderapp.R
 import com.example.androidreminderapp.receiver.ReminderNotificationActionReceiver
 import com.example.androidreminderapp.ui.notification.FullScreenReminderActivity
+import com.example.androidreminderapp.MainActivity
+import java.text.DateFormat
+import java.security.MessageDigest
+import java.io.FileNotFoundException
+import java.util.Date
 
 object NotificationHelper {
     const val CHANNEL_ID = "notify_reminder_alarms_v2"
+    private const val SCHEDULED_CHANNEL_ID = "notify_alarm_scheduled_v1"
     const val NOTIFICATION_ID_BASE = 1000
 
     const val EXTRA_REMINDER_ID = "notification_reminder_id"
     const val EXTRA_TITLE = "notification_title"
     const val EXTRA_DESCRIPTION = "notification_description"
     const val EXTRA_SNOOZE_MINUTES = "notification_snooze_minutes"
+    const val EXTRA_ALARM_SOUND = "notification_alarm_sound"
 
     const val ACTION_OPEN_ALERT = "com.mynominee.notify.action.OPEN_ALERT"
     const val ACTION_SNOOZE = "com.mynominee.notify.action.SNOOZE"
     const val ACTION_DISMISS = "com.mynominee.notify.action.DISMISS"
     const val ACTION_MARK_DONE = "com.mynominee.notify.action.MARK_DONE"
     const val ACTION_SHOW_SNOOZED = "com.mynominee.notify.action.SHOW_SNOOZED"
+    private const val ACTION_OPEN_SCHEDULED = "com.mynominee.notify.action.OPEN_SCHEDULED"
 
     private const val TAG = "NotificationHelper"
 
@@ -64,14 +74,144 @@ object NotificationHelper {
         manager.createNotificationChannel(channel)
     }
 
+    fun showScheduledReminderNotification(
+        context: Context,
+        reminderId: Long,
+        title: String,
+        triggerAtMillis: Long
+    ) {
+        createScheduledNotificationChannel(context)
+
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.w(TAG, "Notification permission is not granted; scheduled reminder $reminderId was not posted.")
+            return
+        }
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+            Log.w(TAG, "Notifications are disabled; scheduled reminder $reminderId was not posted.")
+            return
+        }
+
+        val openAppIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val contentIntent = PendingIntent.getActivity(
+            context,
+            requestCode(reminderId, ACTION_OPEN_SCHEDULED),
+            openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val scheduledTime = DateFormat.getDateTimeInstance(
+            DateFormat.MEDIUM,
+            DateFormat.SHORT
+        ).format(Date(triggerAtMillis))
+        val notification = NotificationCompat.Builder(context, SCHEDULED_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_reminder)
+            .setLargeIcon(createLargeIcon(context))
+            .setContentTitle("Alarm set")
+            .setContentText("$title · $scheduledTime")
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText("Your alarm \"$title\" is set for $scheduledTime.")
+                    .setSummaryText("Notify")
+            )
+            .setColor(android.graphics.Color.rgb(200, 62, 255))
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setShowWhen(true)
+            .setWhen(triggerAtMillis)
+            .setAutoCancel(true)
+            .setContentIntent(contentIntent)
+            .build()
+
+        try {
+            NotificationManagerCompat.from(context).notify(notificationIdFor(reminderId), notification)
+        } catch (exception: SecurityException) {
+            Log.e(TAG, "Unable to post scheduled reminder notification $reminderId.", exception)
+        }
+    }
+
+    private fun createScheduledNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+
+        val channel = NotificationChannel(
+            SCHEDULED_CHANNEL_ID,
+            "Alarm set confirmations",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Confirms alarms when they are created or updated"
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            setSound(null, null)
+            enableVibration(false)
+        }
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(channel)
+    }
+
+    private fun createReminderNotificationChannel(context: Context, alarmSound: String): String {
+        val soundUri = Uri.parse(alarmSound).takeIf {
+            alarmSound != "default" && it.scheme == "content"
+        }
+        if (soundUri == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            createNotificationChannel(context)
+            return CHANNEL_ID
+        }
+        val canReadSound = try {
+            context.contentResolver.openAssetFileDescriptor(soundUri, "r")?.use { true } ?: false
+        } catch (exception: FileNotFoundException) {
+            Log.w(TAG, "Selected alarm audio is no longer available; using the default alarm sound.", exception)
+            false
+        } catch (exception: SecurityException) {
+            Log.w(TAG, "Selected alarm audio is no longer accessible; using the default alarm sound.", exception)
+            false
+        }
+        if (!canReadSound) {
+            createNotificationChannel(context)
+            return CHANNEL_ID
+        }
+
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(soundUri.toString().toByteArray())
+            .take(12)
+            .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+        val channelId = "notify_reminder_custom_$digest"
+        val channel = NotificationChannel(
+            channelId,
+            "Reminder alarms - custom sound",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Reminder alarms using a selected audio file"
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 250, 150, 350)
+            enableLights(true)
+            lightColor = android.graphics.Color.rgb(200, 62, 255)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            setSound(
+                soundUri,
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+        }
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(channel)
+        return channelId
+    }
+
     fun showReminderNotification(
         context: Context,
         reminderId: Long,
         title: String,
         description: String?,
-        snoozeMinutes: Int = 10
+        snoozeMinutes: Int = 10,
+        alarmSound: String = "default"
     ) {
-        createNotificationChannel(context)
+        val channelId = createReminderNotificationChannel(context, alarmSound)
 
         if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -103,7 +243,7 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notificationId = notificationIdFor(reminderId)
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_reminder)
             .setLargeIcon(createLargeIcon(context))
             .setContentTitle("Reminder")
@@ -126,18 +266,34 @@ object NotificationHelper {
             .addAction(
                 android.R.drawable.ic_media_pause,
                 "Snooze ($snoozeMinutes min)",
-                actionPendingIntent(context, ACTION_SNOOZE, reminderId, title, description, snoozeMinutes)
+                actionPendingIntent(
+                    context,
+                    ACTION_SNOOZE,
+                    reminderId,
+                    title,
+                    description,
+                    snoozeMinutes,
+                    alarmSound
+                )
             )
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
                 "Dismiss",
-                actionPendingIntent(context, ACTION_DISMISS, reminderId, title, description, snoozeMinutes)
+                actionPendingIntent(
+                    context,
+                    ACTION_DISMISS,
+                    reminderId,
+                    title,
+                    description,
+                    snoozeMinutes,
+                    alarmSound
+                )
             )
-            .addAction(
-                android.R.drawable.checkbox_on_background,
-                "Mark done",
-                actionPendingIntent(context, ACTION_MARK_DONE, reminderId, title, description, snoozeMinutes)
-            )
+         //   .addAction(
+            //    android.R.drawable.checkbox_on_background,
+              //  "Mark done",
+             //   actionPendingIntent(context, ACTION_MARK_DONE, reminderId, title, description, snoozeMinutes)
+          //  )
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT < 34 || manager.canUseFullScreenIntent()) {
@@ -159,7 +315,8 @@ object NotificationHelper {
         reminderId: Long,
         title: String,
         description: String?,
-        snoozeMinutes: Int
+        snoozeMinutes: Int,
+        alarmSound: String = "default"
     ): PendingIntent {
         val intent = Intent(context, ReminderNotificationActionReceiver::class.java).apply {
             this.action = action
@@ -167,6 +324,7 @@ object NotificationHelper {
             putExtra(EXTRA_TITLE, title)
             putExtra(EXTRA_DESCRIPTION, description)
             putExtra(EXTRA_SNOOZE_MINUTES, snoozeMinutes.coerceAtLeast(1))
+            putExtra(EXTRA_ALARM_SOUND, alarmSound)
         }
         return PendingIntent.getBroadcast(
             context,
@@ -181,7 +339,8 @@ object NotificationHelper {
         reminderId: Long,
         title: String,
         description: String?,
-        snoozeMinutes: Int
+        snoozeMinutes: Int,
+        alarmSound: String = "default"
     ): Boolean {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val pendingIntent = snoozedPendingIntent(
@@ -189,7 +348,8 @@ object NotificationHelper {
             reminderId,
             title,
             description,
-            snoozeMinutes
+            snoozeMinutes,
+            alarmSound
         )
         val triggerAtMillis = System.currentTimeMillis() +
             snoozeMinutes.coerceAtLeast(1) * 60_000L
@@ -237,7 +397,8 @@ object NotificationHelper {
         reminderId: Long,
         title: String?,
         description: String?,
-        snoozeMinutes: Int
+        snoozeMinutes: Int,
+        alarmSound: String = "default"
     ): PendingIntent {
         val intent = Intent(context, ReminderNotificationActionReceiver::class.java).apply {
             action = ACTION_SHOW_SNOOZED
@@ -245,6 +406,7 @@ object NotificationHelper {
             putExtra(EXTRA_TITLE, title)
             putExtra(EXTRA_DESCRIPTION, description)
             putExtra(EXTRA_SNOOZE_MINUTES, snoozeMinutes.coerceAtLeast(1))
+            putExtra(EXTRA_ALARM_SOUND, alarmSound)
         }
         return PendingIntent.getBroadcast(
             context,

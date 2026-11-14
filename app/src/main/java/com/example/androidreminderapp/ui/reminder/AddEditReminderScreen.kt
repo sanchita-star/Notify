@@ -55,6 +55,24 @@ fun AddEditReminderScreen(
             viewModel.saveReminder(context, onNavigateBack)
         }
     }
+    val audioPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                viewModel.alarmSound = uri.toString()
+                viewModel.errorMessage = null
+            } catch (exception: SecurityException) {
+                viewModel.errorMessage = "Notify could not keep access to that audio file. Choose another file."
+            } catch (exception: IllegalArgumentException) {
+                viewModel.errorMessage = "That audio file cannot be used. Choose another file."
+            }
+        }
+    }
 
     if (exactAlarmDialogOpen) {
         AlertDialog(
@@ -113,6 +131,8 @@ fun AddEditReminderScreen(
                     set(Calendar.YEAR, year)
                     set(Calendar.MONTH, month)
                     set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
                 }
                 viewModel.timeInMillis = updatedCal.timeInMillis
                 viewModel.startDate = updatedCal.timeInMillis
@@ -121,6 +141,7 @@ fun AddEditReminderScreen(
             calendar.get(Calendar.MONTH),
             calendar.get(Calendar.DAY_OF_MONTH)
         )
+
     }
 
     val timePickerDialog = remember {
@@ -139,6 +160,28 @@ fun AddEditReminderScreen(
             calendar.get(Calendar.MINUTE),
             false
         )
+    }
+
+    val showDatePicker = {
+        val selectedDate = Calendar.getInstance().apply {
+            timeInMillis = viewModel.timeInMillis
+        }
+        datePickerDialog.updateDate(
+            selectedDate.get(Calendar.YEAR),
+            selectedDate.get(Calendar.MONTH),
+            selectedDate.get(Calendar.DAY_OF_MONTH)
+        )
+        datePickerDialog.show()
+    }
+    val showTimePicker = {
+        val selectedTime = Calendar.getInstance().apply {
+            timeInMillis = viewModel.timeInMillis
+        }
+        timePickerDialog.updateTime(
+            selectedTime.get(Calendar.HOUR_OF_DAY),
+            selectedTime.get(Calendar.MINUTE)
+        )
+        timePickerDialog.show()
     }
 
     val repeatUntilDialog = remember {
@@ -174,7 +217,7 @@ fun AddEditReminderScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = { timePickerDialog.show() }) {
+                    TextButton(onClick = showTimePicker) {
                         Text("Set")
                     }
                 },
@@ -235,23 +278,23 @@ fun AddEditReminderScreen(
                 ) {
                     TimeChoiceCard(
                         modifier = Modifier.weight(1f),
-                        label = "Date",
+                        label = "Calendar date",
                         value = dateFormat.format(Date(viewModel.timeInMillis)),
                         selected = false,
-                        onClick = { datePickerDialog.show() }
+                        onClick = showDatePicker
                     )
                     TimeChoiceCard(
                         modifier = Modifier.weight(1f),
                         label = "Alarm time",
                         value = timeFormat.format(Date(viewModel.timeInMillis)),
                         selected = true,
-                        onClick = { timePickerDialog.show() }
+                        onClick = showTimePicker
                     )
                 }
 
                 TimeDial(
                     time = timeFormat.format(Date(viewModel.timeInMillis)),
-                    onClick = { timePickerDialog.show() }
+                    onClick = showTimePicker
                 )
 
                 if (viewModel.errorMessage != null) {
@@ -296,6 +339,34 @@ fun AddEditReminderScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.medium
                         )
+
+                        Text("Alarm sound", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            if (viewModel.alarmSound == "default") {
+                                "Default alarm sound"
+                            } else {
+                                "Custom audio file selected"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = { audioPickerLauncher.launch(arrayOf("audio/*")) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Choose audio file")
+                            }
+                            if (viewModel.alarmSound != "default") {
+                                TextButton(onClick = { viewModel.alarmSound = "default" }) {
+                                    Text("Use default")
+                                }
+                            }
+                        }
                     }
                 }
 
